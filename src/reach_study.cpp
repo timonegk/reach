@@ -109,20 +109,29 @@ void ReachStudy::run()
 #pragma omp parallel for num_threads(params_.max_threads)
   for (std::size_t i = 0; i < target_poses_.size(); ++i)
   {
-    const Eigen::Isometry3d& tgt_frame = target_poses_[i] * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
     if (abort) continue;
+    const Eigen::Isometry3d& tgt_frame = target_poses_[i] * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
 
     // Solve IK
     try
     {
       std::vector<double> solution;
       double score, ik_time;
-      std::tie(solution, score, ik_time) = evaluateIK(tgt_frame, params_.seed_state, ik_solver_, evaluator_);
+      auto result = evaluateIK(tgt_frame, params_.seed_state, ik_solver_, evaluator_);
 
-      ReachRecord msg(true, tgt_frame, params_.seed_state, zip(ik_solver_->getJointNames(), solution), score, ik_time);
-      {
-        std::lock_guard<std::mutex> lock{ mutex_ };
-        active_result->operator[](i) = msg;
+      if (result.has_value()) {
+          std::tie(solution, score, ik_time) = result.value();
+          ReachRecord msg(true, tgt_frame, params_.seed_state, zip(ik_solver_->getJointNames(), solution), score, ik_time);
+          {
+              std::lock_guard<std::mutex> lock{ mutex_ };
+              active_result->operator[](i) = msg;
+          }
+      } else {
+          ReachRecord msg(false, tgt_frame, params_.seed_state, params_.seed_state, 0.0, 0.0);
+          {
+              std::lock_guard<std::mutex> lock{ mutex_ };
+              active_result->operator[](i) = msg;
+          }
       }
     }
     catch (const std::exception&)

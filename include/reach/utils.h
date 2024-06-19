@@ -25,6 +25,7 @@
 #include <memory>
 #include <pcl/search/kdtree.h>
 #include <vector>
+#include <optional>
 
 namespace reach
 {
@@ -39,9 +40,10 @@ static std::map<std::string, T> zip(const std::vector<std::string>& keys, const 
   return map;
 }
 
-std::tuple<std::vector<double>, double, double> evaluateIK(const Eigen::Isometry3d& target,
-                                                           const std::map<std::string, double>& seed,
-                                                           IKSolver::ConstPtr ik_solver, Evaluator::ConstPtr evaluator);
+std::optional<std::tuple<std::vector<double>, double, double>> evaluateIK(const Eigen::Isometry3d& target,
+                                                                          const std::map<std::string, double>& seed,
+                                                                          IKSolver::ConstPtr ik_solver,
+                                                                          Evaluator::ConstPtr evaluator);
 
 using SearchTreePtr = pcl::search::KdTree<pcl::PointXYZ>::Ptr;
 SearchTreePtr createSearchTree(const VectorIsometry3d& poses);

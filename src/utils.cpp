@@ -20,9 +20,10 @@
 
 namespace reach
 {
-std::tuple<std::vector<double>, double, double> evaluateIK(const Eigen::Isometry3d& target,
-                                                   const std::map<std::string, double>& seed,
-                                                   IKSolver::ConstPtr ik_solver, Evaluator::ConstPtr evaluator)
+std::optional<std::tuple<std::vector<double>, double, double>> evaluateIK(const Eigen::Isometry3d& target,
+                                                                          const std::map<std::string, double>& seed,
+                                                                          IKSolver::ConstPtr ik_solver,
+                                                                          Evaluator::ConstPtr evaluator)
 {
   auto ik_start_time = std::chrono::high_resolution_clock::now();
   std::vector<std::vector<double>> poses = ik_solver->solveIK(target, seed);
@@ -33,6 +34,10 @@ std::tuple<std::vector<double>, double, double> evaluateIK(const Eigen::Isometry
   const std::vector<std::string> joint_names = ik_solver->getJointNames();
   double best_score = 0.0;
   std::size_t best_idx = 0;
+
+  if (poses.empty()) {
+      return std::nullopt;
+  }
 
   for (std::size_t i = 0; i < poses.size(); ++i)
   {
@@ -123,28 +128,25 @@ std::map<std::size_t, ReachRecord> reachNeighborsDirect(const ReachResult& db, c
   auto it = neighbors.begin();
   while (it != neighbors.end())
   {
-    try
-    {
-      // Use current point's IK solution as seed
-      std::vector<double> new_solution;
-      double score, ik_time;
-      std::tie(new_solution, score, ik_time) = evaluateIK(it->second.goal, rec.goal_state, solver, evaluator);
+    // Use current point's IK solution as seed
+    std::vector<double> new_solution;
+    double score, ik_time;
+    auto result = evaluateIK(it->second.goal, rec.goal_state, solver, evaluator);
+    if (result.has_value()) {
+        std::tie(new_solution, score, ik_time) = result.value();
 
-      // Update the record
-      if (!it->second.reached || score > it->second.score)
-      {
-        it->second.reached = true;
-        it->second.seed_state = rec.goal_state;
-        it->second.goal_state = zip(solver->getJointNames(), new_solution);
-        it->second.score = score;
-        it->second.ik_time = ik_time;
-      }
-      ++it;
-    }
-    catch (const std::exception&)
-    {
-      it = neighbors.erase(it);
-      continue;
+        // Update the record
+        if (!it->second.reached || score > it->second.score)
+        {
+          it->second.reached = true;
+          it->second.seed_state = rec.goal_state;
+          it->second.goal_state = zip(solver->getJointNames(), new_solution);
+          it->second.score = score;
+          it->second.ik_time = ik_time;
+        }
+        ++it;
+    } else {
+        it = neighbors.erase(it);
     }
   }
 
@@ -178,34 +180,31 @@ void reachNeighborsRecursive(const ReachResult& db, const ReachRecord& rec, IKSo
       if (std::find(result.reached_pts.begin(), result.reached_pts.end(), neighbors[i]) != result.reached_pts.end())
         continue;
 
-      try
-      {
-        ReachRecord neighbor = db.at(neighbors[i]);
+      ReachRecord neighbor = db.at(neighbors[i]);
 
-        // Use current point's IK solution as seed
-        std::vector<double> new_pose;
-        double score, ik_time;
-        std::tie(new_pose, score, ik_time) = evaluateIK(neighbor.goal, rec.goal_state, solver, evaluator);
-
-        // Store information in new reach record object
-        //        neighbor.seed_state = rec.goal_state;
-        //        neighbor.goal_state = zip(solver->getJointNames(), new_pose);
-        //        neighbor.reached = true;
-        //        neighbor.score = score;
-
-        // Calculate the joint distance between the seed and new goal states
-        for (const auto& pair : rec.goal_state)
-        {
-          result.joint_distance += std::abs(neighbor.goal_state.at(pair.first) - pair.second);
-        }
-
-        // Recursively enter this function at the new neighboring location
-        reachNeighborsRecursive(db, neighbor, solver, evaluator, radius, result, search_tree);
+      // Use current point's IK solution as seed
+      std::vector<double> new_pose;
+      double score, ik_time;
+      auto ik_result = evaluateIK(neighbor.goal, rec.goal_state, solver, evaluator);
+      if (!ik_result.has_value()) {
+          continue;
       }
-      catch (const std::exception&)
+      std::tie(new_pose, score, ik_time) = ik_result.value();
+
+      // Store information in new reach record object
+      //        neighbor.seed_state = rec.goal_state;
+      //        neighbor.goal_state = zip(solver->getJointNames(), new_pose);
+      //        neighbor.reached = true;
+      //        neighbor.score = score;
+
+      // Calculate the joint distance between the seed and new goal states
+      for (const auto& pair : rec.goal_state)
       {
-        continue;
+        result.joint_distance += std::abs(neighbor.goal_state.at(pair.first) - pair.second);
       }
+
+      // Recursively enter this function at the new neighboring location
+      reachNeighborsRecursive(db, neighbor, solver, evaluator, radius, result, search_tree);
     }
   }
 }
