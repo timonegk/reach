@@ -104,11 +104,13 @@ void ReachStudy::run()
   // First loop through all points in point cloud and get IK solution
   std::atomic<unsigned long> current_counter;
   current_counter = 0;
+  std::atomic<bool> abort = false;
 
 #pragma omp parallel for num_threads(params_.max_threads)
   for (std::size_t i = 0; i < target_poses_.size(); ++i)
   {
     const Eigen::Isometry3d& tgt_frame = target_poses_[i] * Eigen::AngleAxisd(M_PI, Eigen::Vector3d::UnitX());
+    if (abort) continue;
 
     // Solve IK
     try
@@ -130,6 +132,7 @@ void ReachStudy::run()
         std::lock_guard<std::mutex> lock{ mutex_ };
         active_result->operator[](i) = msg;
       }
+      abort = true;
     }
 
     // Print function progress
