@@ -117,17 +117,18 @@ void ReachStudy::run()
     {
       std::vector<double> solution;
       double score, ik_time;
+      int solution_callback_count;
       auto result = evaluateIK(tgt_frame, params_.seed_state, ik_solver_, evaluator_);
 
       if (result.has_value()) {
-          std::tie(solution, score, ik_time) = result.value();
-          ReachRecord msg(true, tgt_frame, params_.seed_state, zip(ik_solver_->getJointNames(), solution), score, ik_time);
+          std::tie(solution, score, ik_time, solution_callback_count) = result.value();
+          ReachRecord msg(true, tgt_frame, params_.seed_state, zip(ik_solver_->getJointNames(), solution), score, ik_time, solution_callback_count);
           {
               std::lock_guard<std::mutex> lock{ mutex_ };
               active_result->operator[](i) = msg;
           }
       } else {
-          ReachRecord msg(false, tgt_frame, params_.seed_state, params_.seed_state, 0.0, 0.0);
+          ReachRecord msg(false, tgt_frame, params_.seed_state, params_.seed_state, 0.0, 0.0, 0);
           {
               std::lock_guard<std::mutex> lock{ mutex_ };
               active_result->operator[](i) = msg;
@@ -136,7 +137,7 @@ void ReachStudy::run()
     }
     catch (const std::exception&)
     {
-      ReachRecord msg(false, tgt_frame, params_.seed_state, params_.seed_state, 0.0, 0.0);
+      ReachRecord msg(false, tgt_frame, params_.seed_state, params_.seed_state, 0.0, 0.0, 0);
       {
         std::lock_guard<std::mutex> lock{ mutex_ };
         active_result->operator[](i) = msg;

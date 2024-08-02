@@ -62,6 +62,7 @@ public:
   virtual std::vector<std::vector<double>> solveIK(const Eigen::Isometry3d& target,
                                                    const std::map<std::string, double>& seed) const = 0;
 
+  mutable int solution_callback_count_{0};
 #ifdef BUILD_PYTHON
   boost::python::list solveIK(const boost::python::numpy::ndarray& target, const boost::python::dict& seed) const;
 #endif

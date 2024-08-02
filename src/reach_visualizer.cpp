@@ -45,12 +45,14 @@ void ReachVisualizer::reSolveIK(const std::size_t record_idx)
   // Re-solve IK at the selected marker
   std::vector<double> goal_pose;
   double score, ik_time;
+  int solution_callback_count;
   auto result = evaluateIK(lookup.goal, lookup.seed_state, solver_, evaluator_);
   if (result.has_value()) {
-    std::tie(goal_pose, score, ik_time) = result.value();
+    std::tie(goal_pose, score, ik_time, solution_callback_count) = result.value();
     lookup.reached = true;
     lookup.score = score;
     lookup.ik_time = ik_time;
+    lookup.solution_callback_count = solution_callback_count;
 
     lookup.goal_state = zip(solver_->getJointNames(), goal_pose);
 

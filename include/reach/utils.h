@@ -40,7 +40,7 @@ static std::map<std::string, T> zip(const std::vector<std::string>& keys, const 
   return map;
 }
 
-std::optional<std::tuple<std::vector<double>, double, double>> evaluateIK(const Eigen::Isometry3d& target,
+std::optional<std::tuple<std::vector<double>, double, double, int>> evaluateIK(const Eigen::Isometry3d& target,
                                                                           const std::map<std::string, double>& seed,
                                                                           IKSolver::ConstPtr ik_solver,
                                                                           Evaluator::ConstPtr evaluator);
